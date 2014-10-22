@@ -1,6 +1,6 @@
 require File.expand_path("../../Abstract/abstract-php-extension", __FILE__)
 
-class Php56Http1 < AbstractPhp55Extension
+class Php55Http1 < AbstractPhp55Extension
   init
   homepage 'http://pecl.php.net/package/pecl_http'
   url 'http://pecl.php.net/get/pecl_http-1.7.6.tgz'
