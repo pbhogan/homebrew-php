@@ -15,7 +15,7 @@ class Php55Http1 < AbstractPhp55Extension
     safe_phpize
     system "./configure", "--prefix=#{prefix}", phpconfig
     system "make"
-    prefix.install "modules/http.so"
+    prefix.install "modules/http1.so"
     write_config_file unless build.include? "without-config-file"
   end
 end
