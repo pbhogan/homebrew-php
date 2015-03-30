@@ -2,19 +2,13 @@ require 'formula'
 require File.join(File.dirname(__FILE__), 'abstract-php-version')
 
 class UnsupportedPhpApiError < RuntimeError
-  attr :name
-
-  def initialize name
-    @name = name
+  def initialize
     super "Unsupported PHP API Version"
   end
 end
 
 class InvalidPhpizeError < RuntimeError
-  attr :name
-
-  def initialize (installed_php_version, required_php_version)
-    @name = name
+  def initialize(installed_php_version, required_php_version)
     super <<-EOS.undent
       Version of phpize (PHP#{installed_php_version}) in $PATH does not support building this extension
              version (PHP#{required_php_version}). Consider installing  with the `--without-homebrew-php` flag.
@@ -31,7 +25,7 @@ class AbstractPhpExtension < Formula
       i = IO.popen("#{phpize} -v")
       out = i.readlines.join("")
       i.close
-      { 53 => 20090626, 54 => 20100412 }.each do |v, api|
+      { 53 => 20090626, 54 => 20100412, 55 => 20121113 }.each do |v, api|
         installed_php_version = v.to_s if out.match(/#{api}/)
       end
 
@@ -52,11 +46,12 @@ class AbstractPhpExtension < Formula
   end
 
   def php_branch
-    matches = /^Php5([3-9]+)/.match(self.class.name)
+    class_name = self.class.name.split("::").last
+    matches = /^Php5([3-9]+)/.match(class_name)
     if matches
       "5." + matches[1]
     else
-      raise "Unable to guess PHP branch for #{self.class.name}"
+      raise "Unable to guess PHP branch for #{class_name}"
     end
   end
 
@@ -65,19 +60,16 @@ class AbstractPhpExtension < Formula
   end
 
   def safe_phpize
-    cmd = ''
-    cmd << "PHP_AUTOCONF=\"#{Formula['autoconf'].opt_prefix}/bin/autoconf\" "
-    cmd << "PHP_AUTOHEADER=\"#{Formula['autoconf'].opt_prefix}/bin/autoheader\" "
-    cmd << phpize
-
-    system cmd
+    ENV["PHP_AUTOCONF"] = "#{Formula["autoconf"].opt_bin}/autoconf"
+    ENV["PHP_AUTOHEADER"] = "#{Formula["autoconf"].opt_bin}/autoheader"
+    system phpize
   end
 
   def phpize
     if build.without? 'homebrew-php'
       "phpize"
     else
-      "#{(Formula[php_formula]).bin}/phpize"
+      "#{Formula[php_formula].opt_bin}/phpize"
     end
   end
 
@@ -85,7 +77,7 @@ class AbstractPhpExtension < Formula
     if build.without? 'homebrew-php'
       "php.ini presented by \"php --ini\""
     else
-      "#{(Formula[php_formula]).config_path}/php.ini"
+      "#{Formula[php_formula].config_path}/php.ini"
     end
   end
 
@@ -93,16 +85,17 @@ class AbstractPhpExtension < Formula
     if build.without? 'homebrew-php'
       ""
     else
-      "--with-php-config=#{(Formula[php_formula]).bin}/php-config"
+      "--with-php-config=#{Formula[php_formula].opt_bin}/php-config"
     end
   end
 
   def extension
-    matches = /^Php5[3-9](.+)/.match(self.class.name)
+    class_name = self.class.name.split("::").last
+    matches = /^Php5[3-9](.+)/.match(class_name)
     if matches
       matches[1].downcase
     else
-      raise "Unable to guess PHP extension name for #{self.class.name}"
+      raise "Unable to guess PHP extension name for #{class_name}"
     end
   end
 
@@ -112,7 +105,7 @@ class AbstractPhpExtension < Formula
   end
 
   def module_path
-    prefix / "#{extension}.so"
+    opt_prefix / "#{extension}.so"
   end
 
   def config_file
@@ -174,7 +167,7 @@ EOS
   def write_config_file
     if config_filepath.file?
       inreplace config_filepath do |s|
-        s.gsub!(/^(zend_)?extension=.+$/, "#{extension_type}=\"#{module_path}\"")
+        s.gsub!(/^(;)?(\s*)(zend_)?extension=.+$/, "\\1\\2#{extension_type}=\"#{module_path}\"")
       end
     elsif config_file
       config_scandir_path.mkpath
